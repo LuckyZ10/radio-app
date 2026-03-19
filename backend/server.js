@@ -580,7 +580,12 @@ app.delete('/api/live/:roomId', (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const liveRoomCount = getAllLiveRooms().length;
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    liveRooms: liveRoomCount
+  });
 });
 
 // Start server
