@@ -18,9 +18,41 @@ const io = new Server(httpServer, {
   }
 });
 
+// Configure CORS
+const allowedOrigins = (process.env.CORS_ORIGIN || '*').split(',');
+
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (allowedOrigins.includes('*') || !origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+app.use(express.json({ strict: true, limit: '1mb' }));
+
+// Validate JSON content type for POST/PUT/PATCH
+app.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH'].includes(req.method) && !req.is('application/json')) {
+    return res.status(415).json({ error: 'Content-Type must be application/json' });
+  }
+  next();
+});
+
+// Request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+  });
+  next();
+});
 
 // Initialize SQLite database with error handling
 const db = new Database('radio.db', { verbose: console.log });
@@ -37,6 +69,20 @@ db.exec(`
     url TEXT NOT NULL,
     genre TEXT NOT NULL,
     imageUrl TEXT
+  )
+`);
+
+// Create live_rooms table for live broadcasting
+db.exec(`
+  CREATE TABLE IF NOT EXISTS live_rooms (
+    id TEXT PRIMARY KEY,
+    broadcaster_name TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    genre TEXT,
+    listener_count INTEGER DEFAULT 0,
+    is_live BOOLEAN DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
   )
 `);
 
@@ -183,10 +229,27 @@ app.post('/api/channels', (req, res) => {
     description = sanitize(description);
     genre = sanitize(genre);
     url = sanitize(url);
+    imageUrl = imageUrl ? sanitize(imageUrl) : null;
+
+    // Validate sanitized inputs aren't empty
+    if (!id || !name || !description || !url || !genre) {
+      return res.status(400).json({ error: 'Fields cannot be empty or just whitespace' });
+    }
+
+    // Additional length validation
+    if (id.length > 50) return res.status(400).json({ error: 'ID too long (max 50 characters)' });
+    if (name.length > 200) return res.status(400).json({ error: 'Name too long (max 200 characters)' });
+    if (description.length > 1000) return res.status(400).json({ error: 'Description too long (max 1000 characters)' });
+    if (genre.length > 50) return res.status(400).json({ error: 'Genre too long (max 50 characters)' });
 
     // Validate URL format
     if (!isValidUrl(url)) {
       return res.status(400).json({ error: 'Invalid URL format' });
+    }
+
+    // Validate imageUrl if provided
+    if (imageUrl && !isValidUrl(imageUrl)) {
+      return res.status(400).json({ error: 'Invalid imageUrl format' });
     }
 
     // Validate genre against allowed values
@@ -245,8 +308,30 @@ httpServer.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\nShutting down gracefully...');
+const gracefulShutdown = (signal) => {
+  console.log(`\nReceived ${signal}, shutting down gracefully...`);
   db.close();
-  process.exit(0);
+  httpServer.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+  gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled rejection at:', promise, 'reason:', reason);
+  gracefulShutdown('unhandledRejection');
 });
