@@ -23,6 +23,7 @@ class _ChannelListScreenState extends State<ChannelListScreen> {
 
   Future<void> _loadChannels() async {
     final channels = await _channelService.getChannels();
+    if (!mounted) return;
     setState(() {
       _channels = channels;
       _isLoading = false;

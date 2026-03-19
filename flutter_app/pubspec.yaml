@@ -12,6 +12,9 @@ dependencies:
   audioplayers: ^6.1.0
   http: ^1.2.0
   cupertino_icons: ^1.0.6
+  socket_io_client: ^2.0.0
+  flutter_webrtc: ^0.9.47
+  permission_handler: ^11.0.0
 
 dev_dependencies:
   flutter_test:

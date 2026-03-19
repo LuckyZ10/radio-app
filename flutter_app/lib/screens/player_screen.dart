@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../models/channel.dart';
@@ -13,6 +14,8 @@ class PlayerScreen extends StatefulWidget {
 
 class _PlayerScreenState extends State<PlayerScreen> {
   late AudioPlayer _audioPlayer;
+  late final StreamSubscription _playerStateSubscription;
+  late final StreamSubscription _playerCompleteSubscription;
   bool _isPlaying = false;
   bool _isLoading = true;
   double _volume = 1.0;
@@ -26,19 +29,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _initializePlayer() async {
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      setState(() {
-        _isPlaying = state == PlayerState.playing;
-        _isLoading = state == PlayerState.stopped || state == PlayerState.disposed;
-        _currentStatus = _getStatusText(state);
-      });
+    _playerStateSubscription = _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlayerState.playing;
+          _isLoading = state == PlayerState.stopped || state == PlayerState.disposed;
+          _currentStatus = _getStatusText(state);
+        });
+      }
     });
 
-    _audioPlayer.onPlayerComplete.listen((_) {
-      setState(() {
-        _isPlaying = false;
-        _currentStatus = 'Stream ended';
-      });
+    _playerCompleteSubscription = _audioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+          _currentStatus = 'Stream ended';
+        });
+      }
     });
   }
 
@@ -94,6 +101,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
+    _playerStateSubscription.cancel();
+    _playerCompleteSubscription.cancel();
     _audioPlayer.dispose();
     super.dispose();
   }
