@@ -8,7 +8,6 @@ class SocketService {
   io.Socket? _socket;
   bool _isConnected = false;
 
-  // Callbacks
   Function(Map<String, dynamic>)? onRoomCreated;
   Function(List<dynamic>)? onRoomsUpdated;
   Function(Map<String, dynamic>)? onRoomJoined;
@@ -29,10 +28,7 @@ class SocketService {
 
     _socket = io.io(
       serverUrl,
-      io.OptionBuilder()
-          .setTransports(['websocket'])
-          .disableAutoConnect()
-          .build(),
+      io.OptionBuilder().setTransports(['websocket']).disableAutoConnect().build(),
     );
 
     _socket!.onConnect((_) {
@@ -48,16 +44,6 @@ class SocketService {
     _socket!.onConnectError((error) {
       print('Socket connection error: $error');
       onError?.call('Connection error: $error');
-    });
-
-    _socket!.onError((error) {
-      print('Socket error: $error');
-      onError?.call(error.toString());
-    });
-
-    // Room events
-    _socket!.on('room-created', (data) {
-      onRoomCreated?.call(Map<String, dynamic>.from(data));
     });
 
     _socket!.on('rooms-updated', (data) {
@@ -76,7 +62,6 @@ class SocketService {
       onRoomEnded?.call(Map<String, dynamic>.from(data));
     });
 
-    // Call events
     _socket!.on('incoming-call', (data) {
       onIncomingCall?.call(Map<String, dynamic>.from(data));
     });
@@ -93,7 +78,6 @@ class SocketService {
       onCallEnded?.call(Map<String, dynamic>.from(data));
     });
 
-    // WebRTC signaling
     _socket!.on('signal', (data) {
       onSignal?.call(data);
     });
@@ -108,7 +92,6 @@ class SocketService {
     _isConnected = false;
   }
 
-  // Room operations
   void createRoom({
     required String broadcasterName,
     required String title,
@@ -140,36 +123,20 @@ class SocketService {
     });
   }
 
-  // WebRTC signaling
   void sendSignal(String to, dynamic signal, String roomId) {
-    _socket?.emit('signal', {
-      'to': to,
-      'signal': signal,
-      'roomId': roomId,
-    });
+    _socket?.emit('signal', {'to': to, 'signal': signal, 'roomId': roomId});
   }
 
-  // Call operations
   void sendCallOffer(String to, dynamic offer, String callerName) {
-    _socket?.emit('call-offer', {
-      'to': to,
-      'offer': offer,
-      'callerName': callerName,
-    });
+    _socket?.emit('call-offer', {'to': to, 'offer': offer, 'callerName': callerName});
   }
 
   void sendCallAnswer(String to, dynamic answer) {
-    _socket?.emit('call-answer', {
-      'to': to,
-      'answer': answer,
-    });
+    _socket?.emit('call-answer', {'to': to, 'answer': answer});
   }
 
   void sendCallIce(String to, dynamic candidate) {
-    _socket?.emit('call-ice', {
-      'to': to,
-      'candidate': candidate,
-    });
+    _socket?.emit('call-ice', {'to': to, 'candidate': candidate});
   }
 
   void endCall(String to) {

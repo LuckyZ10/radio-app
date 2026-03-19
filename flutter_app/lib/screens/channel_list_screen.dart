@@ -5,7 +5,6 @@ import 'player_screen.dart';
 
 class ChannelListScreen extends StatefulWidget {
   const ChannelListScreen({super.key});
-
   @override
   State<ChannelListScreen> createState() => _ChannelListScreenState();
 }
@@ -22,85 +21,62 @@ class _ChannelListScreenState extends State<ChannelListScreen> {
   }
 
   Future<void> _loadChannels() async {
-    final channels = await _channelService.getChannels();
-    if (!mounted) return;
-    setState(() {
-      _channels = channels;
-      _isLoading = false;
-    });
+    try {
+      final channels = await _channelService.getChannels();
+      if (mounted) {
+        setState(() {
+          _channels = channels;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Internet Radio'),
+        title: const Text('Radio Stations'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
+              padding: const EdgeInsets.all(16),
               itemCount: _channels.length,
               itemBuilder: (context, index) {
                 final channel = _channels[index];
-                return ChannelTile(channel: channel);
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: _getGenreColor(channel.genre),
+                      child: const Icon(Icons.radio, color: Colors.white),
+                    ),
+                    title: Text(channel.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(channel.description, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    trailing: Chip(label: Text(channel.genre)),
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => PlayerScreen(channel: channel)));
+                    },
+                  ),
+                );
               },
             ),
-    );
-  }
-}
-
-class ChannelTile extends StatelessWidget {
-  final Channel channel;
-
-  const ChannelTile({super.key, required this.channel});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: _getGenreColor(channel.genre),
-          child: Text(
-            channel.name.isNotEmpty ? channel.name[0] : '?',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-        ),
-        title: Text(channel.name),
-        subtitle: Text(channel.description),
-        trailing: Chip(
-          label: Text(channel.genre),
-          backgroundColor: _getGenreColor(channel.genre).withOpacity(0.2),
-        ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PlayerScreen(channel: channel),
-            ),
-          );
-        },
-      ),
     );
   }
 
   Color _getGenreColor(String genre) {
     switch (genre.toLowerCase()) {
-      case 'news':
-        return Colors.red;
-      case 'classical':
-        return Colors.brown;
-      case 'jazz':
-        return Colors.blue;
-      case 'alternative':
-        return Colors.purple;
-      case 'electronic':
-        return Colors.orange;
-      case 'lo-fi':
-        return Colors.deepPurple;
-      default:
-        return Colors.grey;
+      case 'news': return Colors.blue;
+      case 'classical': return Colors.purple;
+      case 'jazz': return Colors.orange;
+      case 'alternative': return Colors.teal;
+      default: return Colors.grey;
     }
   }
 }

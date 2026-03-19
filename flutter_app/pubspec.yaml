@@ -1,5 +1,5 @@
 name: radio_app
-description: A cross-platform internet radio player.
+description: A cross-platform internet radio player with live broadcasting.
 publish_to: 'none'
 version: 1.0.0+1
 

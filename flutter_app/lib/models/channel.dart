@@ -17,12 +17,12 @@ class Channel {
 
   factory Channel.fromJson(Map<String, dynamic> json) {
     return Channel(
-      id: json['id'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      description: json['description'] as String? ?? '',
-      url: json['url'] as String? ?? '',
-      genre: json['genre'] as String? ?? 'Other',
-      imageUrl: json['imageUrl'] as String?,
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      description: json['description'] ?? '',
+      url: json['url'] ?? '',
+      genre: json['genre'] ?? '',
+      imageUrl: json['imageUrl'],
     );
   }
 

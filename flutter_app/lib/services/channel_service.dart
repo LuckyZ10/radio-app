@@ -1,39 +1,70 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/channel.dart';
 
 class ChannelService {
-  // Use 10.0.2.2 for Android emulator, localhost for iOS simulator
-  // TODO: Make this configurable via environment variables
-  static String get baseUrl {
-    // Can be overridden by setting an environment variable
-    const String envBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: '');
-    return envBaseUrl.isNotEmpty ? envBaseUrl : 'http://10.0.2.2:3000';
-  }
-
-  static const Duration _timeout = Duration(seconds: 10);
+  static const String _baseUrl = 'http://10.0.2.2:3000/api';
 
   Future<List<Channel>> getChannels() async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/api/channels'))
-          .timeout(_timeout);
+      final response = await http.get(
+        Uri.parse('$_baseUrl/channels'),
+        headers: {'Content-Type': 'application/json'},
+      );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
+        final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) => Channel.fromJson(json)).toList();
       } else {
         throw Exception('Failed to load channels: ${response.statusCode}');
       }
-    } on http.ClientException catch (e) {
-      // Log network errors for debugging
-      debugPrint('Network error: $e');
-      return _getFallbackChannels();
     } catch (e) {
-      // Log other errors but still return fallback
-      debugPrint('Error loading channels: $e');
+      // Return fallback channels if backend is unavailable
       return _getFallbackChannels();
+    }
+  }
+
+  Future<Channel?> getChannel(String id) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/channels/$id'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return Channel.fromJson(jsonDecode(response.body));
+      } else {
+        return null;
+      }
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<bool> addChannel(Channel channel) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/channels'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(channel.toJson()),
+      );
+
+      return response.statusCode == 201;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteChannel(String id) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/channels/$id'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
     }
   }
 
