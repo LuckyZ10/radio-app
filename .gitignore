@@ -1,21 +1,44 @@
-# Database
-radio.db
-*.db
-
 # Dependencies
 node_modules/
-flutter_app/.dart_tool/
-flutter_app/.flutter-plugins
-flutter_app/.flutter-plugins-dependencies
-flutter_app/build/
-flutter_app/pub.cache
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# Build outputs
+build/
+*.apk
+*.aab
+*.ipa
+*.dSYM.zip
+*.dSYM
 
 # IDE
 .idea/
 .vscode/
+*.iml
 *.swp
 *.swo
-
-# OS
 .DS_Store
-Thumbs.db
+
+# Flutter
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/.packages
+flutter_app/pubspec.lock
+
+# Backend
+backend/node_modules/
+backend/radio.db
+backend/radio.db-wal
+backend/radio.db-shm
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*

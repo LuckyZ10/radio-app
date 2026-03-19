@@ -1,0 +1,47 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout 代码
+      uses: actions/checkout@v4
+
+    - name: 🔧 设置 Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+        channel: 'stable'
+
+    - name: 🔍 检查 Flutter 版本
+      run: flutter doctor -v
+
+    - name: 📦 获取依赖
+      run: |
+        cd flutter_app
+        flutter pub get
+
+    - name: 🔨 构建 APK
+      run: |
+        cd flutter_app
+        flutter build apk --release
+
+    - name: 📤 上传 APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: radio-app-apk
+        path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+        retention-days: 30
+
+    - name: 📊 显示 APK 信息
+      run: |
+        echo "✅ APK 构建完成！"
+        ls -lh flutter_app/build/app/outputs/flutter-apk/app-release.apk
