@@ -151,21 +151,163 @@ if (channelCount.count === 0) {
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);
 
-  // Join a channel room for live listening
+  // Join a channel room (Phase 1 - preserved for compatibility)
   socket.on('join-channel', (channelId) => {
     socket.join(`channel:${channelId}`);
     console.log(`Socket ${socket.id} joined channel: ${channelId}`);
   });
 
-  // Leave a channel room
+  // Leave a channel room (Phase 1)
   socket.on('leave-channel', (channelId) => {
     socket.leave(`channel:${channelId}`);
     console.log(`Socket ${socket.id} left channel: ${channelId}`);
   });
 
+  // === Phase 2: Live Streaming ===
+
+  // Create live room
+  socket.on('create-room', (data, callback) => {
+    try {
+      const { broadcasterName, title, description, genre } = data;
+
+      if (!broadcasterName || !title) {
+        return callback({ error: 'broadcasterName and title are required' });
+      }
+
+      const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const room = createLiveRoom({
+        id: roomId,
+        broadcasterName: sanitize(String(broadcasterName)),
+        title: sanitize(String(title)),
+        description: description ? sanitize(String(description)) : null,
+        genre: genre ? sanitize(String(genre)) : null,
+        socketId: socket.id
+      });
+
+      socket.join(`room:${roomId}`);
+      callback({ room });
+
+      // Broadcast room list update
+      io.emit('rooms-updated', getAllLiveRooms());
+    } catch (error) {
+      console.error('Error creating room:', error);
+      callback({ error: 'Failed to create room' });
+    }
+  });
+
+  // Join live room as listener
+  socket.on('join-room', (data) => {
+    const { roomId } = data;
+    const room = getLiveRoom(roomId);
+
+    if (!room) {
+      return socket.emit('error', { message: 'Room not found' });
+    }
+
+    socket.join(`room:${roomId}`);
+    const newCount = updateListenerCount(roomId, 1);
+
+    // Notify broadcaster and room
+    io.to(`room:${roomId}`).emit('listener-updated', {
+      roomId,
+      listenerCount: newCount
+    });
+
+    socket.emit('room-joined', { room, listenerCount: newCount });
+    console.log(`Socket ${socket.id} joined live room: ${roomId}`);
+  });
+
+  // Leave live room
+  socket.on('leave-room', (data) => {
+    const { roomId } = data;
+    socket.leave(`room:${roomId}`);
+    const newCount = updateListenerCount(roomId, -1);
+
+    io.to(`room:${roomId}`).emit('listener-updated', {
+      roomId,
+      listenerCount: newCount
+    });
+
+    console.log(`Socket ${socket.id} left live room: ${roomId}`);
+  });
+
+  // End live room
+  socket.on('end-room', (data, callback) => {
+    const { roomId } = data;
+    const room = getLiveRoom(roomId);
+
+    if (!room || room.broadcasterSocketId !== socket.id) {
+      return callback({ error: 'Not authorized to end this room' });
+    }
+
+    endLiveRoom(roomId);
+    io.to(`room:${roomId}`).emit('room-ended', { roomId });
+    io.emit('rooms-updated', getAllLiveRooms());
+
+    callback({ success: true });
+  });
+
+  // === WebRTC Signaling ===
+
+  // Relay WebRTC signals between peers
+  socket.on('signal', (data) => {
+    const { to, signal, roomId } = data;
+    io.to(to).emit('signal', {
+      from: socket.id,
+      signal,
+      roomId
+    });
+  });
+
+  // === 1v1 Call Signaling ===
+
+  // Incoming call offer
+  socket.on('call-offer', (data) => {
+    const { to, offer, callerName } = data;
+    io.to(to).emit('incoming-call', {
+      from: socket.id,
+      callerName,
+      offer
+    });
+  });
+
+  // Call answer
+  socket.on('call-answer', (data) => {
+    const { to, answer } = data;
+    io.to(to).emit('call-answered', {
+      from: socket.id,
+      answer
+    });
+  });
+
+  // ICE candidates for calls
+  socket.on('call-ice', (data) => {
+    const { to, candidate } = data;
+    io.to(to).emit('call-ice', {
+      from: socket.id,
+      candidate
+    });
+  });
+
+  // End call
+  socket.on('call-end', (data) => {
+    const { to } = data;
+    io.to(to).emit('call-ended', { from: socket.id });
+  });
+
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log(`Client disconnected: ${socket.id}`);
+
+    // Check if this was a broadcaster and clean up
+    for (const [roomId, room] of liveRooms.entries()) {
+      if (room.broadcasterSocketId === socket.id) {
+        endLiveRoom(roomId);
+        io.to(`room:${roomId}`).emit('room-ended', { roomId });
+        io.emit('rooms-updated', getAllLiveRooms());
+        break;
+      }
+    }
   });
 });
 
