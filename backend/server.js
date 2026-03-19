@@ -351,6 +351,91 @@ app.delete('/api/channels/:id', (req, res) => {
   }
 });
 
+// POST /api/live - Create a new live broadcast room
+app.post('/api/live', (req, res) => {
+  try {
+    let { broadcasterName, title, description, genre } = req.body;
+
+    // Validate required fields
+    if (!broadcasterName || !title) {
+      return res.status(400).json({ error: 'broadcasterName and title are required' });
+    }
+
+    // Sanitize inputs
+    broadcasterName = sanitize(String(broadcasterName));
+    title = sanitize(String(title));
+    description = description ? sanitize(String(description)) : null;
+    genre = genre ? sanitize(String(genre)) : null;
+
+    // Length validation
+    if (broadcasterName.length > 50) return res.status(400).json({ error: 'broadcasterName too long (max 50)' });
+    if (title.length > 200) return res.status(400).json({ error: 'title too long (max 200)' });
+    if (description && description.length > 500) return res.status(400).json({ error: 'description too long (max 500)' });
+
+    // Generate unique room ID
+    const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const room = createLiveRoom({
+      id: roomId,
+      broadcasterName,
+      title,
+      description,
+      genre,
+      socketId: req.body.socketId
+    });
+
+    res.status(201).json(room);
+  } catch (error) {
+    console.error('Error creating live room:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/live - Get all active live rooms
+app.get('/api/live', (req, res) => {
+  try {
+    const rooms = getAllLiveRooms();
+    res.json(rooms);
+  } catch (error) {
+    console.error('Error fetching live rooms:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/live/:roomId - Get a specific live room
+app.get('/api/live/:roomId', (req, res) => {
+  try {
+    const room = getLiveRoom(req.params.roomId);
+    if (!room) {
+      return res.status(404).json({ error: 'Live room not found' });
+    }
+    res.json(room);
+  } catch (error) {
+    console.error('Error fetching live room:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/live/:roomId - End a live broadcast
+app.delete('/api/live/:roomId', (req, res) => {
+  try {
+    const roomId = req.params.roomId;
+    const success = endLiveRoom(roomId);
+
+    if (!success) {
+      return res.status(404).json({ error: 'Live room not found' });
+    }
+
+    // Notify all listeners in the room
+    io.to(`room:${roomId}`).emit('room-ended', { roomId });
+
+    res.json({ message: 'Live room ended successfully' });
+  } catch (error) {
+    console.error('Error ending live room:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
