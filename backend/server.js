@@ -169,6 +169,62 @@ io.on('connection', (socket) => {
   });
 });
 
+// In-memory live rooms management
+const liveRooms = new Map();
+
+function createLiveRoom(roomData) {
+  const room = {
+    id: roomData.id,
+    broadcasterName: roomData.broadcasterName,
+    title: roomData.title,
+    description: roomData.description,
+    genre: roomData.genre,
+    listenerCount: 0,
+    isLive: true,
+    createdAt: new Date().toISOString(),
+    broadcasterSocketId: roomData.socketId
+  };
+  liveRooms.set(room.id, room);
+
+  // Persist to database
+  db.prepare(`
+    INSERT INTO live_rooms (id, broadcaster_name, title, description, genre, listener_count, is_live, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(room.id, room.broadcasterName, room.title, room.description || null, room.genre || null, 0, 1, room.createdAt);
+
+  return room;
+}
+
+function getLiveRoom(roomId) {
+  return liveRooms.get(roomId);
+}
+
+function getAllLiveRooms() {
+  return Array.from(liveRooms.values()).filter(room => room.isLive);
+}
+
+function updateListenerCount(roomId, delta) {
+  const room = liveRooms.get(roomId);
+  if (room) {
+    room.listenerCount += delta;
+    db.prepare('UPDATE live_rooms SET listener_count = ? WHERE id = ?')
+      .run(room.listenerCount, roomId);
+    return room.listenerCount;
+  }
+  return 0;
+}
+
+function endLiveRoom(roomId) {
+  const room = liveRooms.get(roomId);
+  if (room) {
+    room.isLive = false;
+    liveRooms.delete(roomId);
+    db.prepare('UPDATE live_rooms SET is_live = 0 WHERE id = ?').run(roomId);
+    return true;
+  }
+  return false;
+}
+
 // API Routes
 
 // GET /api/channels - Get all channels
